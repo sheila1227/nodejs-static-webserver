@@ -60,7 +60,7 @@ function processArguments() {
 function requestHandler(request, response) {
     var pathName = url.parse(request.url).pathname;
     if(pathName){
-    	pathName = pathName.slice(1iz); //remove '/'
+    	pathName = pathName.slice(1); //remove '/'
     }
     routeHandler(pathName, request, response);
 }
