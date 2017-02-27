@@ -15,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/sheila1227/nodejs-webserver/issues"
   },
-  "homepage": "https://github.com/sheila1227/nodejs-webserver#readme"
+  "homepage": "https://github.com/sheila1227/nodejs-webserver#readme",
+  "dependencies": {
+    "yargs": "^6.6.0"
+  }
 }

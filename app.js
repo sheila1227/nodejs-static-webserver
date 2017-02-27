@@ -2,10 +2,13 @@ var http = require('http');
 var url = require('url');
 var fs = require('fs');
 var path = require('path');
-var port = defaultPort = 8081;
-var homedir = defaultHomedir = '';
-var defaultPage = 'index.html';
-
+var argv = require('yargs').alias('p', 'port').alias('h', 'homedir').argv;
+var config;
+var defaultConfig = {
+	port: 8081,
+	homedir: path.resolve('.'),
+	homePage: 'index.html'
+};
 var mimeTypes = {
     "css": "text/css",
     "gif": "image/gif",
@@ -34,46 +37,35 @@ var httpServer = {
 function init() {
     processArguments();
     http.createServer(requestHandler)
-        .listen(port, function(error) {
+        .listen(config.port, function(error) {
             if (error) {
-                console.error('Unable to listen on port', port, error);
+                console.error('Unable to listen on port', config.port, error);
             } else {
-                console.log('Listening on port ' + port);
+                console.log('Listening on port ' + config.port);
             }
         });
 }
 
 function processArguments() {
-    if (process.argv.length > 2) {
-        var argvs = process.argv.slice(2);
-        argvs.forEach(function(arg) {
-            //get port
-            var portMatchResults = arg.match(/^port=(\d+)$/);
-            port = (portMatchResults && portMatchResults[1]) ? portMatchResults[1] : defaultPort;
-            //get homedir
-            var homedirMatchResults = arg.match(/^homedir=(\w+)$/);
-            homedir = (homedirMatchResults && homedirMatchResults[1]) ? homedirMatchResults[1] : defaultHomedir;
-        });
-    }
+	config = {
+		port: argv.port || defaultConfig.port,
+		homedir: argv.homedir || defaultConfig.homedir
+	}
 }
 
 function requestHandler(request, response) {
     var pathName = url.parse(request.url).pathname;
-    if(pathName){
-    	pathName = pathName.slice(1); //remove '/'
-    }
+    pathName = path.join(config.homedir, pathName);
     routeHandler(pathName, request, response);
 }
 
 function routeHandler(pathName, request, response) {
-    var fs = require('fs');
-
     fs.stat(pathName, function(err, stat) {
         if (err == null) {
             if (stat.isDirectory()) {
-                routeHandler(pathname + '/' + defaultPage, request, response);
+                routeHandler(path.join(pathName,defaultConfig.homePage), request, response);
             } else if (stat.isFile()) {
-                responseFile(pathname, request, response);
+                responseFile(pathName, request, response);
             } else {
                 response.writeHead(404, { 'Content-Type': 'text/plain' });
                 response.write('URL NOT FOUND: ' + pathName);
