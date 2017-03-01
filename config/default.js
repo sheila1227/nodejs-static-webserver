@@ -1,4 +1,5 @@
 module.exports = {
     port: 9527,
-    root: './'
+    root: './',
+    indexPage: 'index.html'
 };

@@ -4,60 +4,67 @@ const fs = require('fs');
 const path = require('path');
 const conf = require('./config/default');
 const mime = require('./config/mime');
+const argv = require('yargs').alias('p', 'port').alias('r', 'root').argv;
 
 class Server {
     constructor() {
-        this.port = conf.port;
-        this.root = conf.root;
+        this.port = argv.port || conf.port;
+        this.root = argv.root || conf.root;
     }
 
-    routeHandler(pathName, request, response) {
+    routeHandler(pathName, req, res) {
         fs.stat(pathName, (err, stat) => {
             if (err == null) {
                 if (stat.isDirectory()) {
-                    routeHandler(pathName + '/' + defaultPage, request, response);
+                    this.routeHandler(path.join(pathName, conf.indexPage), req, res);
                 } else if (stat.isFile()) {
-                    this.responseFile(pathName, request, response);
+                    this.responseFile(pathName, req, res);
                 } else {
-                    response.writeHead(404, {
-                        'Content-Type': 'text/plain'
-                    });
-                    response.write('URL NOT FOUND: ' + pathName);
-                    response.end();
+                    this.responseNotFound(req, res);
                 }
             } else {
-                response.writeHead(404, {
-                    'Content-Type': 'text/plain'
-                });
-                response.write('URL NOT FOUND: ' + pathName);
-                response.end();
+                this.responseNotFound(req, res);
 
             }
         });
     }
 
-    responseFile(filePath, request, response) {
-        var content = fs.statSync(filePath);
-        response.writeHead(200, {
-            'Content-Type': this.getContentType(filePath),
-            'Content-Length': content.size
-        });
+    responseFile(filePath, req, res) {
+        fs.stat(filePath, (err, stats) => {
+            if (!err) {
+                res.writeHead(200, {
+                    'Content-Type': this.getContentType(filePath),
+                    'Content-Length': stats.size
+                });
 
-        var readStream = fs.createReadStream(filePath);
-        readStream.pipe(response);
+                let readStream = fs.createReadStream(filePath);
+                readStream.pipe(res);
+            } else {
+                res.writeHead(500, {
+                    'Content-Type': 'text/plain'
+                })
+                res.end(err);
+            }
+        });
+    }
+
+    responseNotFound(req, res) {
+        res.writeHead(404, {
+            'Content-Type': 'text/html'
+        });
+        res.write(`<h1>Not Found</h1><p>The requested URL ${url.parse(req.url).pathname} was not found on this server.</p>`);
+        res.end();
     }
 
     getContentType(filePath) {
-        var fileExtension = path.extname(filePath).split('.').pop();
-        return mime[fileExtension];
+        let fileExtension = path.extname(filePath).split('.').pop();
+        return mime[fileExtension] || 'text/plain';
     }
 
     start() {
         http.createServer((req, res) => {
-            var pathName = url.parse(req.url).pathname;
-            if (pathName) {
-                pathName = pathName.slice(1); //remove '/'
-            }
+            let pathName = url.parse(req.url).pathname;
+            pathName = path.join(conf.root, pathName);
             this.routeHandler(pathName, req, res);
         }).listen(this.port, err => {
             if (err) {
