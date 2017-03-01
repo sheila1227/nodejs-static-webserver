@@ -32,13 +32,26 @@ class Server {
     responseFile(filePath, req, res) {
         fs.stat(filePath, (err, stats) => {
             if (!err) {
-                res.writeHead(200, {
-                    'Content-Type': this.getContentType(filePath),
-                    'Content-Length': stats.size
-                });
+                if (path.extname(filePath).slice(1).match(conf.fileMatch)) {
+                    let expires = new Date(Date.now() + conf.maxAge * 1000);
+                    res.setHeader('Expires', expires.toUTCString());
+                    res.setHeader('Cache-Control', `max-age=${conf.maxAge}`)
+                }
 
-                let readStream = fs.createReadStream(filePath);
-                readStream.pipe(res);
+                let lastModifiedTime = stats.mtime.toUTCString();
+                res.setHeader('Last-Modified', lastModifiedTime);
+                if (req.headers['if-modified-since'] && req.headers['if-modified-since'] === lastModifiedTime) {
+                    res.writeHead(304, 'Not Modified');
+                    res.end();
+                } else {
+                    res.writeHead(200, {
+                        'Content-Type': this.getContentType(filePath),
+                        'Content-Length': stats.size
+                    });
+
+                    let readStream = fs.createReadStream(filePath);
+                    readStream.pipe(res);
+                }
             } else {
                 res.writeHead(500, {
                     'Content-Type': 'text/plain'
