@@ -17,7 +17,11 @@ class Server {
         fs.stat(pathName, (err, stat) => {
             if (err == null) {
                 if (stat.isDirectory()) {
-                    this.routeHandler(path.join(pathName, conf.indexPage), req, res);
+                    if (fs.existsSync(path.join(pathName, conf.indexPage))) {
+                        this.responseFile(path.join(pathName, conf.indexPage), req, res);
+                    } else {
+                        this.responseContentList(pathName, req, res);
+                    }
                 } else if (stat.isFile()) {
                     this.responseFile(pathName, req, res);
                 } else {
@@ -26,6 +30,25 @@ class Server {
             } else {
                 this.responseNotFound(req, res);
 
+            }
+        });
+    }
+
+    responseContentList(pathName, req, res) {
+        fs.readdir(pathName, (err, files) => {
+            if (err) {
+                res.writeHead(500, {
+                    'Content-Type': 'text/plain'
+                });
+                res.end(err);
+            } else {
+            	const requestPath = url.parse(req.url).pathname;
+                let content = `<h1>Index of ${requestPath}</h1>`;
+                files.forEach(file => {
+                    content += `<p><a href='${path.join(requestPath,file)}'>${file}</a></p>`;
+                });
+                res.writeHead(200, { 'Content-Type': 'text/html' });
+                res.end(content);
             }
         });
     }
@@ -45,14 +68,14 @@ class Server {
                     res.writeHead(304, 'Not Modified');
                     res.end();
                 } else {
-                	res.setHeader('Content-Type', this.getContentType(filePath));
-                	res.setHeader('Content-Length', stats.size);
+                    res.setHeader('Content-Type', this.getContentType(filePath));
+                    res.setHeader('Content-Length', stats.size);
                     this.compressHandler(filePath, req, res);
                 }
             } else {
                 res.writeHead(500, {
                     'Content-Type': 'text/plain'
-                })
+                });
                 res.end(err);
             }
         });
@@ -67,21 +90,21 @@ class Server {
     }
 
     compressHandler(filePath, req, res) {
-    	let readStream = fs.createReadStream(filePath);
-    	if (path.extname(filePath).match(conf.zipMatch)){
-    		let acceptEncoding = req.headers['accept-encoding']||'';
-    		if(acceptEncoding.match(/\bgzip\b/)){
-    			res.writeHead(200, {'Content-Encoding': 'gzip'});
-    			readStream.pipe(zlib.createGzip()).pipe(res);
-    		}else if(acceptEncoding.match(/\bdeflate\b/)){
-    			res.writeHead(200, {'Content-Encoding': 'deflate'});
-    			readStream.pipe(zlib.createDeflate()).pipe(res);
-    		}else{
-    			readStream.pipe(res);
-    		}
-    	}else{
-    		readStream.pipe(res);
-    	}   	
+        let readStream = fs.createReadStream(filePath);
+        if (path.extname(filePath).match(conf.zipMatch)) {
+            let acceptEncoding = req.headers['accept-encoding'] || '';
+            if (acceptEncoding.match(/\bgzip\b/)) {
+                res.writeHead(200, { 'Content-Encoding': 'gzip' });
+                readStream.pipe(zlib.createGzip()).pipe(res);
+            } else if (acceptEncoding.match(/\bdeflate\b/)) {
+                res.writeHead(200, { 'Content-Encoding': 'deflate' });
+                readStream.pipe(zlib.createDeflate()).pipe(res);
+            } else {
+                readStream.pipe(res);
+            }
+        } else {
+            readStream.pipe(res);
+        }
     }
 
     getContentType(filePath) {
@@ -91,8 +114,8 @@ class Server {
 
     start() {
         http.createServer((req, res) => {
-            let pathName = url.parse(req.url).pathname;
-            pathName = path.join(conf.root, pathName);
+            let pathName = decodeURI(url.parse(req.url).pathname);
+            pathName = path.join(this.root, pathName);
             this.routeHandler(pathName, req, res);
         }).listen(this.port, err => {
             if (err) {
