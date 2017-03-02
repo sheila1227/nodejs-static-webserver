@@ -3,5 +3,6 @@ module.exports = {
     root: './',
     indexPage: 'index.html',
     maxAge: 60,
-    fileMatch: /^(png|jpg|css|js|json)$/ig
+    fileMatch: /^\.(png|jpg|css|js|json)$/ig,
+    zipMatch: /^\.(css|js|html)$/ig
 };

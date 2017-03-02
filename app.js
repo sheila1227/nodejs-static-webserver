@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const conf = require('./config/default');
 const mime = require('./config/mime');
+const zlib = require('zlib');
 const argv = require('yargs').alias('p', 'port').alias('r', 'root').argv;
 
 class Server {
@@ -32,7 +33,7 @@ class Server {
     responseFile(filePath, req, res) {
         fs.stat(filePath, (err, stats) => {
             if (!err) {
-                if (path.extname(filePath).slice(1).match(conf.fileMatch)) {
+                if (path.extname(filePath).match(conf.fileMatch)) {
                     let expires = new Date(Date.now() + conf.maxAge * 1000);
                     res.setHeader('Expires', expires.toUTCString());
                     res.setHeader('Cache-Control', `max-age=${conf.maxAge}`)
@@ -44,13 +45,9 @@ class Server {
                     res.writeHead(304, 'Not Modified');
                     res.end();
                 } else {
-                    res.writeHead(200, {
-                        'Content-Type': this.getContentType(filePath),
-                        'Content-Length': stats.size
-                    });
-
-                    let readStream = fs.createReadStream(filePath);
-                    readStream.pipe(res);
+                	res.setHeader('Content-Type', this.getContentType(filePath));
+                	res.setHeader('Content-Length', stats.size);
+                    this.compressHandler(filePath, req, res);
                 }
             } else {
                 res.writeHead(500, {
@@ -67,6 +64,24 @@ class Server {
         });
         res.write(`<h1>Not Found</h1><p>The requested URL ${url.parse(req.url).pathname} was not found on this server.</p>`);
         res.end();
+    }
+
+    compressHandler(filePath, req, res) {
+    	let readStream = fs.createReadStream(filePath);
+    	if (path.extname(filePath).match(conf.zipMatch)){
+    		let acceptEncoding = req.headers['accept-encoding']||'';
+    		if(acceptEncoding.match(/\bgzip\b/)){
+    			res.writeHead(200, {'Content-Encoding': 'gzip'});
+    			readStream.pipe(zlib.createGzip()).pipe(res);
+    		}else if(acceptEncoding.match(/\bdeflate\b/)){
+    			res.writeHead(200, {'Content-Encoding': 'deflate'});
+    			readStream.pipe(zlib.createDeflate()).pipe(res);
+    		}else{
+    			readStream.pipe(res);
+    		}
+    	}else{
+    		readStream.pipe(res);
+    	}   	
     }
 
     getContentType(filePath) {
