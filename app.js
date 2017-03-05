@@ -5,7 +5,7 @@ const path = require('path');
 const conf = require('./config/default');
 const mime = require('./config/mime');
 const zlib = require('zlib');
-const opn  = require('opn');
+const opn = require('opn');
 const os = require('os');
 const ifaces = os.networkInterfaces();
 const argv = require('yargs').alias('p', 'port').alias('r', 'root').argv;
@@ -59,6 +59,7 @@ class Server {
     responseFile(filePath, req, res) {
         fs.stat(filePath, (err, stats) => {
             if (!err) {
+                res.setHeader('Accept-Ranges', 'bytes');
                 if (path.extname(filePath).match(conf.fileMatch)) {
                     let expires = new Date(Date.now() + conf.maxAge * 1000);
                     res.setHeader('Expires', expires.toUTCString());
@@ -72,8 +73,22 @@ class Server {
                     res.end();
                 } else {
                     res.setHeader('Content-Type', this.getContentType(filePath));
-                    res.setHeader('Content-Length', stats.size);
-                    this.compressHandler(filePath, req, res);
+
+                    let range = this.getRange(req.headers['range'], stats.size);
+                    let readStream;
+                    if (range && range.isValid) {
+                        res.setHeader('Content-Range', `bytes ${range.start}-${range.end}/stats.size`);
+                        res.setHeader('Content-Length', range.end - range.start + 1);
+                        readStream = fs.createReadStream(filePath, { start: range.start, end: range.end });
+                        this.compressHandler(filePath, readStream, 206, 'Partial Content', req, res);
+                    } else if (range && !range.isValid) {
+                        res.writeHead(416, 'Request Range Not Satisfiable');
+                        res.end();
+                    } else {
+                        readStream = fs.createReadStream(filePath);
+                        res.setHeader('Content-Length', stats.size);
+                        this.compressHandler(filePath, readStream, 200, 'OK', req, res);
+                    }
                 }
             } else {
                 res.writeHead(500, {
@@ -92,20 +107,23 @@ class Server {
         res.end();
     }
 
-    compressHandler(filePath, req, res) {
-        let readStream = fs.createReadStream(filePath);
+    compressHandler(filePath, readStream, statusCode, message, req, res) {
         if (path.extname(filePath).match(conf.zipMatch)) {
             let acceptEncoding = req.headers['accept-encoding'] || '';
             if (acceptEncoding.match(/\bgzip\b/)) {
-                res.writeHead(200, { 'Content-Encoding': 'gzip' });
+                res.setHeader('Content-Encoding', 'gzip');
+                res.writeHead(statusCode, message);
                 readStream.pipe(zlib.createGzip()).pipe(res);
             } else if (acceptEncoding.match(/\bdeflate\b/)) {
-                res.writeHead(200, { 'Content-Encoding': 'deflate' });
+                res.setHeader('Content-Encoding', 'deflate');
+                res.writeHead(statusCode, message);
                 readStream.pipe(zlib.createDeflate()).pipe(res);
             } else {
+                res.writeHead(statusCode, message);
                 readStream.pipe(res);
             }
         } else {
+            res.writeHead(statusCode, message);
             readStream.pipe(res);
         }
     }
@@ -115,8 +133,35 @@ class Server {
         return mime[fileExtension] || 'text/plain';
     }
 
+    getRange(rangeInHeaders, fullSize) {
+        if (!rangeInHeaders) {
+            return null;
+        }
+        if (rangeInHeaders.indexOf(',') !== -1) {
+            return { isValid: false };
+        }
+        let range = rangeInHeaders.split('-'),
+            start = parseInt(range[0], 10),
+            end = parseInt(range[1], 10);
+        if (isNaN(start)) {
+            start = fullSize - end;
+            end = fullSize - 1;
+        } else if (isNaN(end)) {
+            end = fullSize - 1;
+        }
+        if (isNaN(start) || isNaN(end) || start > end || end > fullSize) {
+            return { isValid: false };
+        }
+        return {
+            start: start,
+            end: end,
+            isValid: true
+        }
+
+    }
+
     openInDefaultBrowser() {
-    	let ipAddress;
+        let ipAddress;
         Object.keys(ifaces).forEach(function(ifname) {
             ifaces[ifname].forEach(function(iface) {
                 if ('IPv4' === iface.family || iface.internal == true) {
