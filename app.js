@@ -5,6 +5,9 @@ const path = require('path');
 const conf = require('./config/default');
 const mime = require('./config/mime');
 const zlib = require('zlib');
+const opn  = require('opn');
+const os = require('os');
+const ifaces = os.networkInterfaces();
 const argv = require('yargs').alias('p', 'port').alias('r', 'root').argv;
 
 class Server {
@@ -42,7 +45,7 @@ class Server {
                 });
                 res.end(err);
             } else {
-            	const requestPath = url.parse(req.url).pathname;
+                const requestPath = url.parse(req.url).pathname;
                 let content = `<h1>Index of ${requestPath}</h1>`;
                 files.forEach(file => {
                     content += `<p><a href='${path.join(requestPath,file)}'>${file}</a></p>`;
@@ -112,6 +115,21 @@ class Server {
         return mime[fileExtension] || 'text/plain';
     }
 
+    openInDefaultBrowser() {
+    	let ipAddress;
+        Object.keys(ifaces).forEach(function(ifname) {
+            ifaces[ifname].forEach(function(iface) {
+                if ('IPv4' === iface.family || iface.internal == true) {
+                    // skip over internal (i.e. 127.0.0.1) and non-ipv4 addresses
+                    ipAddress = iface.address;
+                    return;
+                }
+            });
+        });
+        ipAddress = ipAddress || '127.0.0.1';
+        opn(`http://${ipAddress}:${this.port}`);
+    }
+
     start() {
         http.createServer((req, res) => {
             let pathName = decodeURI(url.parse(req.url).pathname);
@@ -122,6 +140,7 @@ class Server {
                 console.log(err);
             } else {
                 console.log(`Server start on port ${this.port}`);
+                this.openInDefaultBrowser();
             }
         });
     }
