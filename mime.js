@@ -1,4 +1,6 @@
-module.exports = {
+const path = require('path');
+
+const mimeTypes = {
     "css": "text/css",
     "gif": "image/gif",
     "html": "text/html",
@@ -17,4 +19,14 @@ module.exports = {
     "wma": "audio/x-ms-wma",
     "wmv": "video/x-ms-wmv",
     "xml": "text/xml"
+};
+
+const lookup = (pathName) => {
+    let ext = path.extname(pathName);
+    ext = ext.split('.').pop();
+    return mimeTypes[ext] || mimeTypes['txt'];
+}
+
+module.exports = {
+    lookup
 };

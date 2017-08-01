@@ -1,0 +1,11 @@
+{
+    "port": 9527,
+    "root": "/Users/sheila1227/Public",
+    "indexPage": "index.html",
+    "cacheControl": true,
+    "expires": true,
+    "etag": true,
+    "lastModified": true,
+    "maxAge": 600,
+    "zipMatch": "^\\.(css|js|html)$"
+}

@@ -10,25 +10,24 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sheila1227/nodejs-webserver.git"
+    "url": "https://github.com/sheila1227/nodejs-static-webserver"
   },
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/sheila1227/nodejs-webserver/issues"
+    "url": "https://github.com/sheila1227/nodejs-static-webserver/issues"
   },
-  "homepage": "https://github.com/sheila1227/nodejs-webserver#readme",
+  "homepage": "https://github.com/sheila1227/nodejs-static-webserver#readme",
   "keywords": [
     "NodeJS",
     "HTTP",
     "server"
   ],
   "dependencies": {
-    "opn": "^4.0.2",
-    "pm2": "^2.4.0"
+    "pm2": "^2.4.0",
+    "yargs": "^6.6.0"
   },
   "devDependencies": {
-    "supervisor": "^0.12.0",
-    "yargs": "^6.6.0"
+    "supervisor": "^0.12.0"
   }
 }
